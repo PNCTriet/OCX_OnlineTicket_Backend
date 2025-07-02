@@ -152,16 +152,17 @@ export class UsersService {
       let user = await this.findBySupabaseId(supabaseUser.id);
 
       if (user) {
-        // Update existing user
-        user = await this.update(user.id, {
+        // Update existing user (không truyền email vì UpdateUserDto không có email)
+        await this.update(user.id, {
           name: supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.name,
-          email: supabaseUser.email,
           avatar_url: supabaseUser.user_metadata?.avatar_url,
           is_verified: supabaseUser.email_confirmed_at ? true : false,
         });
+        // Lấy lại user đầy đủ thông tin
+        user = await this.findOne(user.id);
       } else {
         // Create new user
-        user = await this.create({
+        const createdUser = await this.create({
           email: supabaseUser.email,
           name: supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.name,
           supabase_id: supabaseUser.id,
@@ -169,9 +170,11 @@ export class UsersService {
           is_verified: supabaseUser.email_confirmed_at ? true : false,
           role: UserRole.USER, // Default role
         });
+        // Lấy lại user đầy đủ thông tin
+        user = await this.findOne(createdUser.id);
       }
 
-      this.logger.log(`User synced with Supabase: ${user.email}`);
+      this.logger.log(`User synced with Supabase: ${user?.email ?? 'unknown'}`);
       return user;
     } catch (error) {
       this.logger.error(`Failed to sync user with Supabase: ${error.message}`);
@@ -187,7 +190,7 @@ export class UsersService {
         UserRole.ADMIN_ORGANIZER,
         UserRole.ADMIN,
         UserRole.SUPERADMIN,
-      ].includes(user.role);
+      ].includes(user.role as any);
     } catch (error) {
       this.logger.error(`Failed to check admin access for user ${userId}: ${error.message}`);
       return false;

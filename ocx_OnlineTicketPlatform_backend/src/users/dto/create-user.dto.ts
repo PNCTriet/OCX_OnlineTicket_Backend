@@ -1,12 +1,5 @@
 import { IsEmail, IsOptional, IsString, IsEnum, IsBoolean } from 'class-validator';
-
-export enum UserRole {
-  USER = 'USER',
-  OWNER_ORGANIZER = 'OWNER_ORGANIZER',
-  ADMIN_ORGANIZER = 'ADMIN_ORGANIZER',
-  ADMIN = 'ADMIN',
-  SUPERADMIN = 'SUPERADMIN',
-}
+import { UserRole } from '@prisma/client';
 
 export class CreateUserDto {
   @IsEmail()
