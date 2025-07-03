@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OCX Ticket - Organizer Dashboard</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
+</head>
+<body class="bg-gray-900 text-white min-h-screen flex flex-col items-center justify-center">
+  <div class="max-w-md w-full p-8 bg-gray-800 rounded-lg shadow-lg">
+    <h1 class="text-3xl font-bold mb-4 text-center">Organizer Dashboard</h1>
+    <p class="mb-6 text-center">You are logged in as <span class="font-semibold">OWNER_ORGANIZER</span> or <span class="font-semibold">ADMIN_ORGANIZER</span>.</p>
+    <div class="mb-4 text-center">
+      <a href="/index.html" class="text-blue-400 hover:underline">Go to Main Page</a>
+    </div>
+    <div class="text-center">
+      <button onclick="logout()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded">Logout</button>
+    </div>
+  </div>
+  <script>
+    function logout() {
+      localStorage.clear();
+      window.location.href = '/index.html';
+    }
+  </script>
+</body>
+</html> 

@@ -114,13 +114,41 @@ loginForm.addEventListener('submit', async (e) => {
         // Success
         showAlert('Login successful! Redirecting...', 'success');
         
-        // Store user data in localStorage
+        // Lấy token và role từ response (giả sử backend trả về data.session.access_token và data.user.role)
+        const token = data.session?.access_token || data.session?.accessToken || null;
+        const role = data.user?.role || null;
+
+        if (token) {
+            localStorage.setItem('token', token);
+        }
+        if (role) {
+            localStorage.setItem('role', role);
+        }
         localStorage.setItem('user', JSON.stringify(data.user));
         localStorage.setItem('session', JSON.stringify(data.session));
-        
-        // Redirect to dashboard after 1 second
+
+        // Redirect theo role
+        let redirectUrl = '';
+        switch (role) {
+            case 'USER':
+                redirectUrl = '/home.html';
+                break;
+            case 'OWNER_ORGANIZER':
+            case 'ADMIN_ORGANIZER':
+                redirectUrl = '/organizer_dashboard.html';
+                break;
+            case 'ADMIN':
+            case 'SUPERADMIN':
+                redirectUrl = '/admin_dashboard.html';
+                break;
+            default:
+                alert('Unauthorized role');
+                redirectUrl = '/';
+        }
+
+        // Redirect sau 1 giây
         setTimeout(() => {
-            window.location.href = '/admin_dashboard';
+            window.location.href = redirectUrl;
         }, 1000);
         
     } catch (error) {

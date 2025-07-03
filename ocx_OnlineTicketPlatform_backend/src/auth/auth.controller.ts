@@ -1,9 +1,12 @@
-import { Controller, Post, Body, Get, UseGuards, Request } from '@nestjs/common';
+import { Controller, Post, Body, Get, UseGuards, Request, Req } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
+import { AuthService } from './auth.service';
+import { Request as ExpressRequest } from 'express';
+import * as jwt from 'jsonwebtoken';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(private readonly supabaseService: SupabaseService, private readonly authService: AuthService) {}
 
   @Post('login')
   async login(@Body() loginDto: { email: string; password: string }) {
@@ -56,18 +59,17 @@ export class AuthController {
   }
 
   @Get('profile')
-  async getProfile(@Request() req) {
-    // This would typically use a JWT guard
-    // For now, we'll return a mock response
-    return {
-      success: true,
-      data: {
-        user: {
-          id: 'mock-user-id',
-          email: 'user@example.com',
-          name: 'Mock User'
-        }
-      }
-    };
+  async getProfile(@Req() req: ExpressRequest) {
+    const authHeader = req.headers['authorization'];
+    if (!authHeader) throw new Error('No token');
+    const token = authHeader.replace('Bearer ', '');
+
+    // Decode JWT (không verify signature ở đây, chỉ lấy payload)
+    const payload: any = jwt.decode(token);
+    const supabaseId = payload.sub;
+
+    // Lấy user từ DB
+    const user = await this.authService.getUserBySupabaseId(supabaseId);
+    return user;
   }
 } 
