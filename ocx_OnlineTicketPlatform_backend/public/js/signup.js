@@ -118,24 +118,32 @@ signupForm.addEventListener('submit', async (e) => {
     setLoading(true);
     
     try {
-        // Sign up with Supabase
-        const { data, error } = await supabase.auth.signUp({
-            email: email,
-            password: password,
-            options: {
-                data: {
-                    name: name,
-                    full_name: name
-                }
-            }
+        // Call backend API to register user (this will sync with both Supabase Auth and local DB)
+        const response = await fetch('/auth/register', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                email: email,
+                password: password,
+                name: name
+            })
         });
         
-        if (error) {
-            throw error;
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.message);
         }
         
         // Success
         showAlert('Account created successfully! Please check your email to confirm your account.', 'success');
+        
+        // Store user data in localStorage for future use
+        if (result.data && result.data.user) {
+            localStorage.setItem('user', JSON.stringify(result.data.user));
+        }
         
         // Clear form
         signupForm.reset();

@@ -101,35 +101,55 @@ loginForm.addEventListener('submit', async (e) => {
     setLoading(true);
     
     try {
-        // Sign in with Supabase
-        const { data, error } = await supabase.auth.signInWithPassword({
-            email: email,
-            password: password
+        // Call backend login API instead of Supabase directly
+        console.log('🔄 Calling login API...');
+        const response = await fetch('/auth/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                email: email,
+                password: password
+            })
         });
+
+        console.log('📡 Response status:', response.status);
+        console.log('📡 Response headers:', response.headers);
+
+        // Check if response is JSON
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            const text = await response.text();
+            console.error('❌ Non-JSON response:', text);
+            throw new Error('Server returned non-JSON response. Please try again.');
+        }
+
+        const result = await response.json();
+        console.log('📡 Response data:', result);
         
-        if (error) {
-            throw error;
+        if (!result.success) {
+            throw new Error(result.message || 'Login failed');
         }
         
         // Success
         showAlert('Login successful! Redirecting...', 'success');
         
-        // Lấy token và role từ response (giả sử backend trả về data.session.access_token và data.user.role)
-        const token = data.session?.access_token || data.session?.accessToken || null;
-        const role = data.user?.role || null;
-
-        if (token) {
-            localStorage.setItem('token', token);
+        // Store user data and token from backend response
+        const user = result.data.user;
+        const session = result.data.session;
+        
+        if (session?.access_token) {
+            localStorage.setItem('token', session.access_token);
         }
-        if (role) {
-            localStorage.setItem('role', role);
-        }
-        localStorage.setItem('user', JSON.stringify(data.user));
-        localStorage.setItem('session', JSON.stringify(data.session));
+        
+        localStorage.setItem('user', JSON.stringify(user));
+        localStorage.setItem('session', JSON.stringify(session));
+        localStorage.setItem('role', user.role);
 
-        // Redirect theo role
+        // Redirect theo role từ backend
         let redirectUrl = '';
-        switch (role) {
+        switch (user.role) {
             case 'USER':
                 redirectUrl = '/home.html';
                 break;
@@ -142,8 +162,8 @@ loginForm.addEventListener('submit', async (e) => {
                 redirectUrl = '/admin_dashboard.html';
                 break;
             default:
-                alert('Unauthorized role');
-                redirectUrl = '/';
+                console.log('Unknown role:', user.role, 'redirecting to home');
+                redirectUrl = '/home.html';
         }
 
         // Redirect sau 1 giây
@@ -172,13 +192,74 @@ loginForm.addEventListener('submit', async (e) => {
     }
 });
 
+// Add authorization header to all requests
+function addAuthHeader() {
+    const token = localStorage.getItem('token');
+    if (token) {
+        // Add token to all fetch requests
+        const originalFetch = window.fetch;
+        window.fetch = function(url, options = {}) {
+            if (options.headers) {
+                options.headers['Authorization'] = `Bearer ${token}`;
+            } else {
+                options.headers = { 'Authorization': `Bearer ${token}` };
+            }
+            return originalFetch(url, options);
+        };
+    }
+}
+
 // Check if user is already logged in
 async function checkAuthStatus() {
-    const { data: { session } } = await supabase.auth.getSession();
+    const token = localStorage.getItem('token');
+    const user = localStorage.getItem('user');
     
-    if (session) {
-        // User is already logged in, redirect to dashboard
-        window.location.href = '/admin_dashboard';
+    if (token && user) {
+        try {
+            // Verify token with backend
+            const response = await fetch('/auth/profile', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                // Token is valid, redirect based on role
+                const userData = JSON.parse(user);
+                let redirectUrl = '';
+                
+                switch (userData.role) {
+                    case 'USER':
+                        redirectUrl = '/home.html';
+                        break;
+                    case 'OWNER_ORGANIZER':
+                    case 'ADMIN_ORGANIZER':
+                        redirectUrl = '/organizer_dashboard.html';
+                        break;
+                    case 'ADMIN':
+                    case 'SUPERADMIN':
+                        redirectUrl = '/admin_dashboard.html';
+                        break;
+                    default:
+                        redirectUrl = '/home.html';
+                }
+                
+                // Only redirect if we're on login page
+                if (window.location.pathname === '/' || window.location.pathname === '/index.html') {
+                    console.log(`🔄 Redirecting authenticated user to: ${redirectUrl}`);
+                    window.location.href = redirectUrl;
+                }
+            } else {
+                // Token invalid, clear storage
+                console.log('❌ Token invalid, clearing storage');
+                localStorage.clear();
+            }
+        } catch (error) {
+            console.error('Auth check failed:', error);
+            localStorage.clear();
+        }
     }
 }
 
@@ -219,6 +300,9 @@ async function signInWithFacebook() {
 
 // Initialize everything when DOM is loaded
 document.addEventListener('DOMContentLoaded', async () => {
+    // Add auth header to all requests
+    addAuthHeader();
+    
     // Check auth status
     await checkAuthStatus();
     
