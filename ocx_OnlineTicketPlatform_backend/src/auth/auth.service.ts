@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { createClient } from '@supabase/supabase-js';
+import { SupabaseUserDto } from './dto/supabase-user.dto';
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -12,6 +13,7 @@ export class AuthService {
   constructor(private readonly prisma: PrismaService) {}
 
   async login(email: string, password: string) {
+    if (!email) throw new Error('Email is required');
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error || !data.user) {
       return { success: false, message: error?.message || 'Invalid credentials' };
@@ -21,7 +23,7 @@ export class AuthService {
     if (!user) {
       user = await this.prisma.user.create({
         data: {
-          email: supabaseUser.email,
+          email,
           name: supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.name,
           role: 'USER',
           is_verified: !!supabaseUser.email_confirmed_at,
@@ -53,6 +55,7 @@ export class AuthService {
   }
 
   async register(email: string, password: string, name?: string) {
+    if (!email) throw new Error('Email is required');
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -61,11 +64,13 @@ export class AuthService {
     if (error || !data.user) {
       return { success: false, message: error?.message || 'Registration failed' };
     }
-    let user = await this.prisma.user.findUnique({ where: { email } });
+    if (!data.user.email) throw new Error('Email is required');
+    const regEmail = data.user.email;
+    let user = await this.prisma.user.findUnique({ where: { email: regEmail } });
     if (!user) {
       user = await this.prisma.user.create({
         data: {
-          email: data.user.email,
+          email: regEmail,
           name: name,
           role: 'USER',
           is_verified: false,
@@ -86,5 +91,31 @@ export class AuthService {
         session: null
       }
     };
+  }
+
+  async getUserBySupabaseId(supabaseId: string) {
+    return this.prisma.user.findUnique({ where: { supabase_id: supabaseId } });
+  }
+
+  async syncUserFromSupabase(supabaseUser: SupabaseUserDto) {
+    if (!supabaseUser.email) throw new Error('Email is required');
+    const email = supabaseUser.email;
+    let user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      user = await this.prisma.user.create({
+        data: {
+          email,
+          name: supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.name,
+          role: 'USER',
+          is_verified: !!supabaseUser.email_confirmed_at,
+        }
+      });
+    } else {
+      await this.prisma.user.update({
+        where: { email },
+        data: { is_verified: !!supabaseUser.email_confirmed_at }
+      });
+    }
+    return user;
   }
 } 
